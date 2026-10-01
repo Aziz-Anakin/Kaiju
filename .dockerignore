@@ -1,0 +1,7 @@
+**/node_modules
+**/dist
+**/coverage
+apps/backend/src/generated
+.env
+.git
+.vscode

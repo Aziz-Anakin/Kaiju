@@ -1,0 +1,138 @@
+generator client {
+  provider            = "prisma-client"
+  output              = "../apps/backend/src/generated/prisma"
+  moduleFormat        = "cjs"
+  importFileExtension = "js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  QC
+  LC
+  CD
+  ADMIN
+}
+
+enum ReservationStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+}
+
+enum TransferStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  DELIVERED
+}
+
+enum TransferRoute {
+  LAND
+  SEA
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  password  String
+  name      String
+  role      Role
+  quarterId Int?
+  createdAt DateTime @default(now())
+
+  quarter            Quarter?      @relation(fields: [quarterId], references: [id])
+  reservations       Reservation[]
+  requestedTransfers Transfer[]    @relation("RequestedBy")
+  approvedTransfers  Transfer[]    @relation("ApprovedBy")
+}
+
+model Quarter {
+  id               Int     @id @default(autoincrement())
+  code             String  @unique
+  name             String
+  seaAccess        Boolean
+  disasterLevel    Int     @default(1)
+  retentionLowered Boolean @default(false)
+
+  users             User[]
+  inventories       Inventory[]
+  reservations      Reservation[]
+  neighbors         Adjacency[]   @relation("Quarter")
+  neighborOf        Adjacency[]   @relation("Neighbor")
+  outgoingTransfers Transfer[]    @relation("FromQuarter")
+  incomingTransfers Transfer[]    @relation("ToQuarter")
+  transitTransfers  Transfer[]    @relation("TransitQuarter")
+}
+
+model Adjacency {
+  quarterId  Int
+  neighborId Int
+
+  quarter  Quarter @relation("Quarter", fields: [quarterId], references: [id])
+  neighbor Quarter @relation("Neighbor", fields: [neighborId], references: [id])
+
+  @@id([quarterId, neighborId])
+}
+
+model ResourceType {
+  id   Int    @id @default(autoincrement())
+  name String @unique
+
+  inventories  Inventory[]
+  reservations Reservation[]
+  transfers    Transfer[]
+}
+
+model Inventory {
+  id              Int @id @default(autoincrement())
+  quarterId       Int
+  resourceTypeId  Int
+  initialQuantity Int
+  quantity        Int
+
+  quarter      Quarter      @relation(fields: [quarterId], references: [id])
+  resourceType ResourceType @relation(fields: [resourceTypeId], references: [id])
+
+  @@unique([quarterId, resourceTypeId])
+}
+
+model Reservation {
+  id             Int               @id @default(autoincrement())
+  quarterId      Int
+  resourceTypeId Int
+  userId         Int
+  quantity       Int
+  startDate      DateTime
+  endDate        DateTime
+  status         ReservationStatus @default(PENDING)
+  createdAt      DateTime          @default(now())
+
+  quarter      Quarter      @relation(fields: [quarterId], references: [id])
+  resourceType ResourceType @relation(fields: [resourceTypeId], references: [id])
+  user         User         @relation(fields: [userId], references: [id])
+}
+
+model Transfer {
+  id               Int            @id @default(autoincrement())
+  fromQuarterId    Int
+  toQuarterId      Int
+  transitQuarterId Int?
+  resourceTypeId   Int
+  quantity         Int
+  route            TransferRoute  @default(LAND)
+  status           TransferStatus @default(PENDING)
+  requestedById    Int
+  approvedById     Int?
+  createdAt        DateTime       @default(now())
+  deliveredAt      DateTime?
+
+  fromQuarter    Quarter      @relation("FromQuarter", fields: [fromQuarterId], references: [id])
+  toQuarter      Quarter      @relation("ToQuarter", fields: [toQuarterId], references: [id])
+  transitQuarter Quarter?     @relation("TransitQuarter", fields: [transitQuarterId], references: [id])
+  resourceType   ResourceType @relation(fields: [resourceTypeId], references: [id])
+  requestedBy    User         @relation("RequestedBy", fields: [requestedById], references: [id])
+  approvedBy     User?        @relation("ApprovedBy", fields: [approvedById], references: [id])
+}
